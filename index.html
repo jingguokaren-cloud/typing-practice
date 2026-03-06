@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>⌨️ 打字练习 — Typing Master</title>
+  <meta name="description" content="互动式键盘打字练习，从字母到单词循序渐进">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 音效开关 -->
+  <button class="sound-toggle" id="soundToggle" title="音效开关">🔊</button>
+
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <h1>⌨️ TYPING MASTER</h1>
+      <p class="subtitle">键盘打字练习 — 从字母到单词，一步步成为打字高手！</p>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="label">得分</div>
+        <div class="value" id="scoreValue">0</div>
+      </div>
+      <div class="stat-item combo">
+        <div class="label">连击</div>
+        <div class="value" id="comboValue">0</div>
+      </div>
+      <div class="stat-item accuracy">
+        <div class="label">准确率</div>
+        <div class="value" id="accuracyValue">100%</div>
+      </div>
+      <div class="stat-item wpm">
+        <div class="label">WPM</div>
+        <div class="value" id="wpmValue">0</div>
+      </div>
+    </div>
+
+    <!-- Mode Tabs -->
+    <div class="mode-tabs">
+      <button class="mode-tab" data-mode="guide">🖐️ 指法教学</button>
+      <button class="mode-tab active" data-mode="letters">🔤 字母认识</button>
+      <button class="mode-tab" data-mode="speed">⚡ 字母连打</button>
+      <button class="mode-tab" data-mode="words">📚 单词挑战</button>
+      <button class="mode-tab" data-mode="favorites">⭐ 收藏夹</button>
+    </div>
+
+    <!-- Lesson Selector (only for word mode) -->
+    <div class="lesson-selector" id="lessonSelector"></div>
+
+    <!-- Highlight & Display Toggles -->
+    <div class="highlight-toggle-bar" id="highlightToggleBar">
+      <div class="toggle-group">
+        <button class="highlight-toggle-btn off" id="highlightToggle">
+          <span id="highlightIcon">�</span> 键盘提示：<strong id="highlightStatus">关</strong>
+        </button>
+        <button class="display-toggle-btn active" id="chineseToggle">
+          🇨🇳 中文提示：<strong>开</strong>
+        </button>
+        <button class="display-toggle-btn active" id="audioDictationToggle">
+          🎧 听写模式：<strong>关</strong>
+        </button>
+      </div>
+    </div>
+
+    <!-- Practice Area -->
+    <div class="practice-area" id="practiceArea">
+      <div class="start-prompt" id="startPrompt">
+        <h3>🔤 字母认识</h3>
+        <p>随机出现一个字母，在键盘上找到它并按下对应的键<br>熟悉每个字母的位置</p>
+        <button class="btn-start" id="btnStart">开 始 练 习</button>
+      </div>
+    </div>
+
+    <!-- Virtual Keyboard -->
+    <div class="keyboard" id="keyboard">
+      <!-- Row 1 -->
+      <div class="keyboard-row">
+        <div class="key" data-key="Q" data-finger="left-pinky">Q</div>
+        <div class="key" data-key="W" data-finger="left-ring">W</div>
+        <div class="key" data-key="E" data-finger="left-middle">E</div>
+        <div class="key" data-key="R" data-finger="left-index">R</div>
+        <div class="key" data-key="T" data-finger="left-index">T</div>
+        <div class="key" data-key="Y" data-finger="right-index">Y</div>
+        <div class="key" data-key="U" data-finger="right-index">U</div>
+        <div class="key" data-key="I" data-finger="right-middle">I</div>
+        <div class="key" data-key="O" data-finger="right-ring">O</div>
+        <div class="key" data-key="P" data-finger="right-pinky">P</div>
+      </div>
+      <!-- Row 2 -->
+      <div class="keyboard-row">
+        <div class="key" data-key="A" data-finger="left-pinky">A</div>
+        <div class="key" data-key="S" data-finger="left-ring">S</div>
+        <div class="key home-row" data-key="D" data-finger="left-middle">D</div>
+        <div class="key home-row" data-key="F" data-finger="left-index">F</div>
+        <div class="key" data-key="G" data-finger="left-index">G</div>
+        <div class="key" data-key="H" data-finger="right-index">H</div>
+        <div class="key home-row" data-key="J" data-finger="right-index">J</div>
+        <div class="key home-row" data-key="K" data-finger="right-middle">K</div>
+        <div class="key" data-key="L" data-finger="right-ring">L</div>
+      </div>
+      <!-- Row 3 -->
+      <div class="keyboard-row">
+        <div class="key" data-key="Z" data-finger="left-pinky">Z</div>
+        <div class="key" data-key="X" data-finger="left-ring">X</div>
+        <div class="key" data-key="C" data-finger="left-middle">C</div>
+        <div class="key" data-key="V" data-finger="left-index">V</div>
+        <div class="key" data-key="B" data-finger="left-index">B</div>
+        <div class="key" data-key="N" data-finger="right-index">N</div>
+        <div class="key" data-key="M" data-finger="right-index">M</div>
+      </div>
+      <!-- Space -->
+      <div class="keyboard-row">
+        <div class="key space" data-key=" " data-finger="thumb">SPACE</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Celebration Overlay -->
+  <div class="celebration" id="celebration">
+    <div class="celebration-content">
+      <div class="emoji">🎉</div>
+      <h2 id="celebrationTitle">太棒了！</h2>
+      <div class="stats-summary" id="celebrationStats"></div>
+      <button class="btn-continue" id="btnContinue">继续练习</button>
+    </div>
+  </div>
+
+  <script src="words.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
