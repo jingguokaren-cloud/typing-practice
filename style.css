@@ -169,7 +169,11 @@ body::after {
 .target-display .char.waiting { color: var(--text-dim); }
 .target-display .char.error { color: var(--neon-red); animation: shake 0.4s ease; text-shadow: 0 0 12px rgba(248, 113, 113, 0.6); }
 
-/* Word mode: hide answer until typed */
+/* Ensure hidden words stay hidden when error animation plays, just flash the background */
+.target-display.hidden-word .char.error { color: transparent; text-shadow: none; background: rgba(248, 113, 113, 0.25); border-radius: 4px; margin: 0 1px; min-width: 28px; }
+
+/* Reveal hint conditionally when wrong 3 times */
+.target-display.hidden-word .char.reveal-hint { color: var(--neon-yellow) !important; text-shadow: 0 0 12px rgba(251, 191, 36, 0.6) !important; background: rgba(251, 191, 36, 0.15) !important; }
 .target-display.hidden-word .char.waiting { color: transparent; background: rgba(255,255,255,0.06); border-radius: 4px; border-bottom: none; margin: 0 1px; min-width: 28px; }
 .target-display.hidden-word .char.current { color: transparent; background: rgba(0, 212, 255, 0.1); border: 1px solid rgba(0, 212, 255, 0.3); border-radius: 4px; margin: 0 1px; min-width: 28px; animation: pulse-glow 1.2s infinite; }
 .target-display.hidden-word .char.dictation-hidden { color: transparent; background: rgba(255,255,255,0.06); border-radius: 4px; border-bottom: none; margin: 0 1px; min-width: 28px; } /* Keep blanks but hide letters */
@@ -352,6 +356,22 @@ body::after {
 .fav-actions button:hover { background: rgba(168, 85, 247, 0.22); box-shadow: 0 0 16px rgba(168, 85, 247, 0.2); }
 .fav-actions button.danger { border-color: var(--neon-red); color: var(--neon-red); background: rgba(248, 113, 113, 0.08); }
 .fav-actions button.danger:hover { background: rgba(248, 113, 113, 0.2); }
+
+/* Favorites filter bar */
+.fav-filter-bar {
+  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+  margin-bottom: 16px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--key-border);
+}
+.fav-filter-btn {
+  font-family: 'Outfit', sans-serif; padding: 5px 12px; border: 1px solid var(--key-border);
+  border-radius: 999px; background: var(--bg-glass); color: var(--text-secondary);
+  cursor: pointer; font-size: 0.78rem; transition: var(--transition);
+}
+.fav-filter-btn:hover { border-color: var(--neon-purple); color: var(--neon-purple); }
+.fav-filter-btn.active { border-color: var(--neon-purple); background: rgba(168, 85, 247, 0.15); color: var(--neon-purple); font-weight: 600; }
+
+.fav-word-streak { display: inline-flex; align-items: center; gap: 1px; margin-left: auto; margin-right: 8px; }
 
 /* — Badge for favorites count — */
 .fav-badge {

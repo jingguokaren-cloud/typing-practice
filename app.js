@@ -48,6 +48,7 @@
   // Current challenge
   let targetChars = [];
   let currentIndex = 0;
+  let currentWrongCount = 0;
   let challengeQueue = [];
   let queueIndex = 0;
 
@@ -58,16 +59,25 @@
 
   // Word mode
   let selectedLesson = 1;
+  let selectedFavLesson = 'all';
+  let selectedFavGroup = 'all';
 
   // Track if current word had any errors (for auto-add to favorites)
   let currentWordHadError = false;
 
   // --- Favorites (localStorage) ---
+  // Each fav: { en, cn, lesson, lessonTitle, correctStreak }
   const FAV_KEY = 'typing_master_favorites';
 
   function loadFavorites() {
     try {
-      return JSON.parse(localStorage.getItem(FAV_KEY)) || [];
+      const favs = JSON.parse(localStorage.getItem(FAV_KEY)) || [];
+      return favs.map(f => ({
+        ...f,
+        correctStreak: f.correctStreak || 0,
+        lesson: f.lesson || 0,
+        lessonTitle: f.lessonTitle || ''
+      }));
     } catch { return []; }
   }
 
@@ -76,12 +86,35 @@
     updateFavBadge();
   }
 
-  function addToFavorites(en, cn) {
+  function addToFavorites(en, cn, lesson, lessonTitle) {
     const favs = loadFavorites();
-    if (!favs.find(f => f.en.toLowerCase() === en.toLowerCase())) {
-      favs.push({ en, cn });
+    const existing = favs.find(f => f.en.toLowerCase() === en.toLowerCase());
+    if (existing) {
+      existing.correctStreak = 0;
+      saveFavorites(favs);
+    } else {
+      favs.push({ en, cn, lesson: lesson || 0, lessonTitle: lessonTitle || '', correctStreak: 0 });
       saveFavorites(favs);
     }
+  }
+
+  function recordFavCorrect(en) {
+    const favs = loadFavorites();
+    const fav = favs.find(f => f.en.toLowerCase() === en.toLowerCase());
+    if (fav) {
+      fav.correctStreak = (fav.correctStreak || 0) + 1;
+      if (fav.correctStreak >= 5) {
+        const filtered = favs.filter(f => f.en.toLowerCase() !== en.toLowerCase());
+        saveFavorites(filtered);
+        return true;
+      }
+      saveFavorites(favs);
+    }
+    return false;
+  }
+
+  function recordFavWrong(en) {
+    // Cumulative mode: do not reset streak on wrong answer
   }
 
   function removeFromFavorites(en) {
@@ -104,15 +137,15 @@
 
   // --- Finger Map (for guide) ---
   const fingerMap = {
-    'left-pinky':  { label: '左小指', keys: ['Q', 'A', 'Z'], color: 'var(--finger-left-pinky)' },
-    'left-ring':   { label: '左无名指', keys: ['W', 'S', 'X'], color: 'var(--finger-left-ring)' },
+    'left-pinky': { label: '左小指', keys: ['Q', 'A', 'Z'], color: 'var(--finger-left-pinky)' },
+    'left-ring': { label: '左无名指', keys: ['W', 'S', 'X'], color: 'var(--finger-left-ring)' },
     'left-middle': { label: '左中指', keys: ['E', 'D', 'C'], color: 'var(--finger-left-middle)' },
-    'left-index':  { label: '左食指', keys: ['R', 'T', 'F', 'G', 'V', 'B'], color: 'var(--finger-left-index)' },
+    'left-index': { label: '左食指', keys: ['R', 'T', 'F', 'G', 'V', 'B'], color: 'var(--finger-left-index)' },
     'right-index': { label: '右食指', keys: ['Y', 'U', 'H', 'J', 'N', 'M'], color: 'var(--finger-right-index)' },
-    'right-middle':{ label: '右中指', keys: ['I', 'K'], color: 'var(--finger-right-middle)' },
-    'right-ring':  { label: '右无名指', keys: ['O', 'L'], color: 'var(--finger-right-ring)' },
+    'right-middle': { label: '右中指', keys: ['I', 'K'], color: 'var(--finger-right-middle)' },
+    'right-ring': { label: '右无名指', keys: ['O', 'L'], color: 'var(--finger-right-ring)' },
     'right-pinky': { label: '右小指', keys: ['P'], color: 'var(--finger-right-pinky)' },
-    'thumb':       { label: '大拇指', keys: ['SPACE'], color: 'var(--finger-thumb)' },
+    'thumb': { label: '大拇指', keys: ['SPACE'], color: 'var(--finger-thumb)' },
   };
 
   // --- Audio (Web Audio API) ---
@@ -132,7 +165,7 @@
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
       osc.connect(gain); gain.connect(ctx.destination);
       osc.start(); osc.stop(ctx.currentTime + duration);
-    } catch (e) {}
+    } catch (e) { }
   }
   function playCorrect() { playTone(880, 0.12, 'sine', 0.12); }
   function playWrong() { playTone(220, 0.25, 'square', 0.08); }
@@ -213,7 +246,7 @@
     html += `<div class="target-display${hiddenClass}">`;
     targetChars.forEach((ch, i) => {
       let cls = 'waiting';
-      
+
       if (i < currentIndex) {
         cls = 'done';
       } else if (audioDictationEnabled) {
@@ -277,14 +310,26 @@
   }
 
   function generateFavoritesChallenge() {
-    const favs = loadFavorites();
+    let favs = loadFavorites();
+    if (selectedFavGroup !== 'all') {
+      favs = favs.filter(f => {
+        const key = f.lesson || 0;
+        const groupNum = Math.ceil(key / 16);
+        const start = (groupNum - 1) * 16 + 1;
+        const end = groupNum * 16;
+        return selectedFavGroup === `${start}-${end}`;
+      });
+    }
+    if (selectedFavLesson !== 'all') {
+      favs = favs.filter(f => String(f.lesson) === String(selectedFavLesson));
+    }
     if (favs.length === 0) return [];
     const shuffled = [...favs];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    return shuffled.map(w => ({ text: w.en, cn: w.cn }));
+    return shuffled.map(w => ({ text: w.en, cn: w.cn, lesson: w.lesson }));
   }
 
   // --- Start Game ---
@@ -292,7 +337,7 @@
     score = 0; combo = 0; maxCombo = 0;
     totalKeys = 0; correctKeys = 0; charCount = 0;
     startTime = Date.now();
-    queueIndex = 0; currentIndex = 0;
+    queueIndex = 0; currentIndex = 0; currentWrongCount = 0;
     isPlaying = true;
 
     switch (currentMode) {
@@ -331,6 +376,7 @@
     const item = challengeQueue[queueIndex];
     targetChars = item.text.split('');
     currentIndex = 0;
+    currentWrongCount = 0;
     currentWordHadError = false;
     renderTarget();
 
@@ -368,11 +414,12 @@
     if (isCorrect) {
       correctKeys++; charCount++; combo++;
       if (combo > maxCombo) maxCombo = combo;
+      currentWrongCount = 0;
       score += 10 + Math.min(combo * 2, 50);
 
       const charEl = $(`#char-${currentIndex}`);
       if (charEl) {
-        charEl.classList.remove('current', 'waiting', 'dictation-hidden');
+        charEl.classList.remove('current', 'waiting', 'dictation-hidden', 'reveal-hint');
         charEl.classList.add('done');
         const rect = charEl.getBoundingClientRect();
         spawnParticles(rect.left + rect.width / 2, rect.top + rect.height / 2, 'var(--neon-green)', 6);
@@ -393,12 +440,21 @@
         const currentWord = challengeQueue[queueIndex - 1];
         const isWordLike = currentMode === 'words' || currentMode === 'favorites';
         let delay = 300;
-        
+
+        if (isWordLike) {
+          if (!currentWordHadError) {
+            recordFavCorrect(currentWord.text);
+          } else {
+            // 如果输错了，将该词重新插入队列，要求连输3次
+            challengeQueue.splice(queueIndex, 0, currentWord, currentWord);
+          }
+        }
+
         if (isWordLike && !audioDictationEnabled) {
           window.playDictationWord(currentWord.text);
-          delay = 1200; // give more time to listen
+          delay = 1200;
         } else if (isWordLike && audioDictationEnabled) {
-          delay = 600; // give a slight pause before the next word dictates
+          delay = 600;
         }
 
         setTimeout(() => loadNextTarget(), delay);
@@ -423,27 +479,36 @@
       if (isWordLike) {
         const currentWord = challengeQueue[queueIndex];
         if (currentWord && currentWord.cn) {
-          addToFavorites(currentWord.text, currentWord.cn);
+          addToFavorites(currentWord.text, currentWord.cn, currentWord.lesson || selectedLesson, nceWords[currentWord.lesson || selectedLesson]?.title || '');
+          recordFavWrong(currentWord.text);
         }
       }
 
+      // 恢复输入错误的提示：发声和字符晃动
+      currentWrongCount++;
       const charEl = $(`#char-${currentIndex}`);
-      if (charEl) { charEl.classList.add('error'); setTimeout(() => charEl.classList.remove('error'), 400); }
+      if (charEl) {
+        charEl.classList.add('error');
+        setTimeout(() => charEl.classList.remove('error'), 400);
+        if (currentWrongCount >= 3) {
+          charEl.classList.add('reveal-hint');
+        }
+      }
       flashKey(key, 'wrong');
       playWrong();
     }
     updateStats();
   }
 
-  window.playDictationWord = function(wordText) {
+  window.playDictationWord = function (wordText) {
     if (!wordText && isPlaying) {
       const currentWord = challengeQueue[queueIndex];
       if (currentWord) wordText = currentWord.text;
     }
-    
+
     if (wordText && soundEnabled) {
       const cleanText = wordText.trim();
-      
+
       if (window.currentAudio) {
         window.currentAudio.pause();
         window.currentAudio = null;
@@ -607,37 +672,98 @@
 
     let html = '<div class="favorites-list">';
     html += '<h3>⭐ 收藏夹</h3>';
-    html += '<p class="fav-subtitle">打字出错的单词会自动添加到这里</p>';
+    html += '<p class="fav-subtitle">打字出错的单词会自动添加到这里 · 累计正确5次自动掌握 ✨</p>';
 
     if (favs.length === 0) {
       html += '<div class="fav-empty">还没有收藏的单词 👍<br>继续保持！</div>';
     } else {
-      for (const fav of favs) {
+      // Group by chunks of 16 (matching lesson selector)
+      const chunkGroups = {}; // { '1-16': { lessons: { 1: { label:'L1', words:[...] } } } }
+      favs.forEach(f => {
+        const key = f.lesson || 0;
+        const groupNum = Math.ceil(key / 16) || 1;
+        const start = (groupNum - 1) * 16 + 1;
+        const end = groupNum * 16;
+        const groupName = `${start}-${end}`;
+
+        if (!chunkGroups[groupName]) chunkGroups[groupName] = { lessons: {} };
+        if (!chunkGroups[groupName].lessons[key]) {
+          chunkGroups[groupName].lessons[key] = { label: 'L' + key, words: [] };
+        }
+        chunkGroups[groupName].lessons[key].words.push(f);
+      });
+
+      html += '<div class="fav-filter-bar">';
+      html += `<button class="fav-filter-btn ${selectedFavGroup === 'all' ? 'active' : ''}" data-fav-group="all">全部 (${favs.length})</button>`;
+      for (const [gName, gData] of Object.entries(chunkGroups)) {
+        const cnt = Object.values(gData.lessons).reduce((s, l) => s + l.words.length, 0);
+        html += `<button class="fav-filter-btn ${selectedFavGroup === gName ? 'active' : ''}" data-fav-group="${gName}">${gName} (${cnt})</button>`;
+      }
+      html += '</div>';
+
+      if (selectedFavGroup !== 'all' && chunkGroups[selectedFavGroup]) {
+        const lessons = chunkGroups[selectedFavGroup].lessons;
+        html += '<div class="fav-filter-bar" style="margin-top:-8px">';
+        html += `<button class="fav-filter-btn ${selectedFavLesson === 'all' ? 'active' : ''}" data-fav-lesson="all">全部</button>`;
+        for (const [lKey, lData] of Object.entries(lessons)) {
+          html += `<button class="fav-filter-btn ${String(selectedFavLesson) === String(lKey) ? 'active' : ''}" data-fav-lesson="${lKey}">${lData.label} (${lData.words.length})</button>`;
+        }
+        html += '</div>';
+      }
+
+      let displayFavs = favs;
+      if (selectedFavGroup !== 'all' && chunkGroups[selectedFavGroup]) {
+        const lKeys = Object.keys(chunkGroups[selectedFavGroup].lessons);
+        displayFavs = favs.filter(f => lKeys.includes(String(f.lesson)));
+        if (selectedFavLesson !== 'all') {
+          displayFavs = displayFavs.filter(f => String(f.lesson) === String(selectedFavLesson));
+        }
+      }
+
+      for (const fav of displayFavs) {
+        const streak = fav.correctStreak || 0;
+        const dots = Array.from({ length: 5 }, (_, i) =>
+          `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;margin:0 1px;background:${i < streak ? 'var(--neon-green)' : 'rgba(255,255,255,0.12)'}"></span>`
+        ).join('');
         html += `
           <div class="fav-word-item">
             <span class="fav-word-en">${fav.en}</span>
             <span class="fav-word-cn">${fav.cn}</span>
+            <span class="fav-word-streak" title="累计正确 ${streak}/5">${dots}</span>
             <button class="fav-word-remove" data-word="${fav.en}">移除</button>
           </div>`;
       }
       html += `
         <div class="fav-actions">
-          <button id="btnPracticeFavs">📝 练习收藏单词</button>
+          <button id="btnPracticeFavs">📝 练习${selectedFavGroup === 'all' ? '全部' : '当前筛选'}单词</button>
           <button id="btnClearFavs" class="danger">🗑️ 清空全部</button>
         </div>`;
     }
     html += '</div>';
     practiceArea.innerHTML = html;
 
-    // Bind remove buttons
-    $$('.fav-word-remove').forEach(btn => {
+    $$('[data-fav-group]').forEach(btn => {
       btn.addEventListener('click', () => {
-        removeFromFavorites(btn.dataset.word);
-        renderFavorites(); // re-render
+        selectedFavGroup = btn.dataset.favGroup;
+        selectedFavLesson = 'all';
+        renderFavorites();
       });
     });
 
-    // Practice favorites
+    $$('[data-fav-lesson]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedFavLesson = btn.dataset.favLesson === 'all' ? 'all' : btn.dataset.favLesson;
+        renderFavorites();
+      });
+    });
+
+    $$('.fav-word-remove').forEach(btn => {
+      btn.addEventListener('click', () => {
+        removeFromFavorites(btn.dataset.word);
+        renderFavorites();
+      });
+    });
+
     const btnPractice = $('#btnPracticeFavs');
     if (btnPractice) {
       btnPractice.addEventListener('click', () => {
@@ -646,7 +772,6 @@
       });
     }
 
-    // Clear all
     const btnClear = $('#btnClearFavs');
     if (btnClear) {
       btnClear.addEventListener('click', () => {
@@ -727,7 +852,6 @@
   function buildLessonSelector() {
     const sortedKeys = Object.keys(nceWords).map(Number).sort((a, b) => a - b);
 
-    // Group lessons into chunks of 16
     const groupingSize = 16;
     const groupEntries = [];
     const groupMap = {};
@@ -744,25 +868,18 @@
       groupMap[groupName].push(key);
     });
 
-    // Row 1: Group buttons
     let barHtml = '<div class="lesson-groups-bar">';
     groupEntries.forEach(name => {
       barHtml += `<button class="lesson-group-btn" data-group="${name}">${name}</button>`;
     });
     barHtml += '</div>';
-
-    // Row 2: Detail area (filled dynamically)
     barHtml += '<div class="lesson-detail-bar" id="lessonDetailBar"></div>';
 
     lessonSelector.innerHTML = barHtml;
-
     const detailBar = $('#lessonDetailBar');
 
     function showGroup(groupName) {
-      // Update group button active state
       $$('.lesson-group-btn').forEach(b => b.classList.toggle('active', b.dataset.group === groupName));
-
-      // Build lesson buttons for this group
       const keys = groupMap[groupName] || [];
       let html = '';
       keys.forEach(key => {
@@ -771,7 +888,6 @@
       });
       detailBar.innerHTML = html;
 
-      // Bind lesson button clicks
       $$('.lesson-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           selectedLesson = parseInt(btn.dataset.lesson);
@@ -782,14 +898,12 @@
       });
     }
 
-    // Group button clicks
     $$('.lesson-group-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         showGroup(btn.dataset.group);
       });
     });
 
-    // Default: open the group containing the selectedLesson
     const defaultGroupNum = Math.ceil(selectedLesson / groupingSize);
     const defaultStart = (defaultGroupNum - 1) * groupingSize + 1;
     const defaultEnd = defaultGroupNum * groupingSize;
@@ -835,7 +949,7 @@
         if (keyChar) {
           handleKeyPress({
             key: keyChar.toLowerCase(),
-            preventDefault: () => {},
+            preventDefault: () => { },
             ctrlKey: false, metaKey: false, altKey: false,
             length: keyChar.length
           });
@@ -859,7 +973,7 @@
       highlightToggle.classList.toggle('off', !highlightEnabled);
       if (!highlightEnabled) clearKeyHighlights();
       else if (isPlaying && currentIndex < targetChars.length) highlightKey(targetChars[currentIndex]);
-      
+
       // Re-render target to update the blinking cursor state
       if (isPlaying) {
         renderTarget();
@@ -882,7 +996,7 @@
         audioDictationEnabled = !audioDictationEnabled;
         audioDictationToggle.innerHTML = `🎧 听写模式：<strong>${audioDictationEnabled ? '开' : '关'}</strong>`;
         audioDictationToggle.classList.toggle('off', !audioDictationEnabled);
-        
+
         // When dictation is turned ON, we should play the current word, and hide target word
         if (isPlaying && audioDictationEnabled && targetChars.length > 0) {
           playDictationWord();
